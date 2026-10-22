@@ -63,7 +63,9 @@ public class TransactionController {
     }
 
     /** Same filters as the list endpoint; returns every matching row (up to the export cap) as CSV. */
-    @GetMapping(value = "/export", produces = "text/csv")
+    // No "produces" restriction: the SPA sends Accept: application/json on every request, and a text/csv-only
+    // mapping made Spring fall through to /{id} with id="export" (400). The handler sets text/csv itself.
+    @GetMapping("/export")
     public void export(
             @AuthenticationPrincipal AuthenticatedUser user,
             @RequestParam(name = "q", required = false) String query,
@@ -85,7 +87,7 @@ public class TransactionController {
         writer.flush();
     }
 
-    @GetMapping("/{id}")
+    @GetMapping("/{id:[0-9a-fA-F-]+}")
     public TransactionResponse get(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID id) {
         return service.get(user.id(), id);
     }
@@ -97,13 +99,13 @@ public class TransactionController {
         return service.create(user.id(), request);
     }
 
-    @PutMapping("/{id}")
+    @PutMapping("/{id:[0-9a-fA-F-]+}")
     public TransactionResponse update(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID id,
                                       @Valid @RequestBody TransactionRequest request) {
         return service.update(user.id(), id, request);
     }
 
-    @DeleteMapping("/{id}")
+    @DeleteMapping("/{id:[0-9a-fA-F-]+}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID id) {
         service.delete(user.id(), id);
