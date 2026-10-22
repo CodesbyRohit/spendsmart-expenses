@@ -1,0 +1,19 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:spendsmart-test;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""
+
+app:
+  clock:
+    fixed: 2026-10-15T10:00:00Z
+    zone: UTC
+  security:
+    login-max-failures: 5
+    login-lockout: 15m
+    registration-per-ip-per-hour: 1000
+
+logging:
+  level:
+    root: WARN
+    com.spendsmart: INFO

@@ -1,0 +1,23 @@
+# Production: PostgreSQL only, credentials required from the environment, secure cookies, no API explorer.
+spring:
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+
+server:
+  forward-headers-strategy: native
+  servlet:
+    session:
+      cookie:
+        secure: ${COOKIE_SECURE:true}
+
+app:
+  docs:
+    enabled: ${APP_API_DOCS_ENABLED:false}
+
+springdoc:
+  api-docs:
+    enabled: ${APP_API_DOCS_ENABLED:false}
+  swagger-ui:
+    enabled: ${APP_API_DOCS_ENABLED:false}

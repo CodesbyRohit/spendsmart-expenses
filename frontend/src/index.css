@@ -1,0 +1,164 @@
+@import "tailwindcss";
+
+/* Dark mode follows the `.dark` class on <html>, which the theme preference controls. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Semantic design tokens. Components use these roles (bg-surface, text-muted, …), never raw palette values,
+ * so light and dark themes swap in one place.
+ */
+:root {
+  color-scheme: light;
+  --bg: #f5f6f8;
+  --surface: #ffffff;
+  --surface-2: #f8f9fb;
+  --surface-sunken: #eef0f4;
+  --border: #e3e6ec;
+  --border-strong: #cdd2dc;
+  --ink: #0f1b33;          /* midnight navy: primary text, sidebar */
+  --text: #1c2638;
+  --text-muted: #5b6475;
+  --text-subtle: #7a8394;
+  --primary: #047857;      /* emerald 700 — passes 4.5:1 for text and buttons */
+  --primary-hover: #065f46;
+  --primary-soft: #e7f6f0;
+  --on-primary: #ffffff;
+  --primary-text: #035e44;
+  --danger: #c2413b;
+  --danger-soft: #fdeeed;
+  --danger-text: #a3302b;
+  --warning: #a15c07;
+  --warning-soft: #fdf4e3;
+  --focus: #2563eb;
+  --sidebar: #0f1b33;
+  --sidebar-text: #c9d1e1;
+  --sidebar-active: #1b2a4a;
+  /* Chart roles — validated with the dataviz palette checker (see docs/ARCHITECTURE.md). */
+  --chart-income: #06775a;
+  --chart-expense: #ef7563;
+  --chart-category: #2f4b80;
+  --chart-grid: #e8ebf0;
+  --chart-axis: #7a8394;
+  --shadow-card: 0 1px 2px rgb(15 27 51 / 0.04), 0 1px 3px rgb(15 27 51 / 0.06);
+  --shadow-pop: 0 10px 30px rgb(15 27 51 / 0.16);
+}
+
+.dark {
+  color-scheme: dark;
+  --bg: #0b1222;
+  --surface: #111a2e;
+  --surface-2: #142038;
+  --surface-sunken: #0e1729;
+  --border: #22304d;
+  --border-strong: #2f4064;
+  --ink: #eef2f8;
+  --text: #dfe5ef;
+  --text-muted: #9aa6bb;
+  --text-subtle: #7d8aa1;
+  --primary: #34b38a;
+  --primary-hover: #4cc79e;
+  --primary-soft: #0f2b27;
+  --on-primary: #04261c;
+  --primary-text: #5fd0aa;
+  --danger: #e36a5e;
+  --danger-soft: #2f1820;
+  --danger-text: #f19087;
+  --warning: #e0a43a;
+  --warning-soft: #2c2312;
+  --focus: #7aa7ff;
+  --sidebar: #08101f;
+  --sidebar-text: #aab5ca;
+  --sidebar-active: #16233f;
+  --chart-income: #0c7352;
+  --chart-expense: #e36a5e;
+  --chart-category: #6f8fd0;
+  --chart-grid: #1f2b45;
+  --chart-axis: #7d8aa1;
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3);
+  --shadow-pop: 0 12px 32px rgb(0 0 0 / 0.5);
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-sunken: var(--surface-sunken);
+  --color-line: var(--border);
+  --color-line-strong: var(--border-strong);
+  --color-ink: var(--ink);
+  --color-body: var(--text);
+  --color-muted: var(--text-muted);
+  --color-subtle: var(--text-subtle);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-soft: var(--primary-soft);
+  --color-on-primary: var(--on-primary);
+  --color-primary-text: var(--primary-text);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-danger-text: var(--danger-text);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-focus: var(--focus);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-text: var(--sidebar-text);
+  --color-sidebar-active: var(--sidebar-active);
+  --shadow-card: var(--shadow-card);
+  --shadow-pop: var(--shadow-pop);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-feature-settings: "cv11", "ss01";
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Amounts line up in columns. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+dialog::backdrop {
+  background: rgb(8 14 28 / 0.55);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+.animate-fade-in {
+  animation: fade-in 160ms ease-out;
+}
+
+@keyframes pulse-soft {
+  50% { opacity: 0.55; }
+}
+.skeleton {
+  background: var(--surface-sunken);
+  border-radius: 6px;
+  animation: pulse-soft 1.4s ease-in-out infinite;
+}
