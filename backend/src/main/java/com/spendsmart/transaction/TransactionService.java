@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -32,7 +33,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class TransactionService {
 
     public static final int MAX_PAGE_SIZE = 100;
-    public static final int MAX_EXPORT_ROWS = 50_000;
     private static final LocalDate EARLIEST_DATE = LocalDate.of(1970, 1, 1);
 
     /** API sort keys → entity properties. Anything else is rejected, so clients cannot sort on arbitrary paths. */
@@ -49,14 +49,17 @@ public class TransactionService {
     private final ApplicationEventPublisher events;
     private final UserLookup userLookup;
     private final UserClock userClock;
+    private final int maxExportRows;
 
     public TransactionService(TransactionRepository transactions, CategoryService categoryService,
-                              ApplicationEventPublisher events, UserLookup userLookup, UserClock userClock) {
+                              ApplicationEventPublisher events, UserLookup userLookup, UserClock userClock,
+                              @Value("${app.export.max-rows:50000}") int maxExportRows) {
         this.transactions = transactions;
         this.categoryService = categoryService;
         this.events = events;
         this.userLookup = userLookup;
         this.userClock = userClock;
+        this.maxExportRows = maxExportRows;
     }
 
     @Transactional(readOnly = true)
@@ -72,15 +75,18 @@ public class TransactionService {
         return PageResponse.from(result, TransactionResponse::of);
     }
 
+    /**
+     * Counts first, so an oversized export is refused with one cheap COUNT query instead of loading every row into
+     * memory and only then discovering it is over the cap.
+     */
     @Transactional(readOnly = true)
     public List<Transaction> exportRows(UUID userId, TransactionFilter filter) {
-        List<Transaction> rows = transactions.findAll(TransactionSpecifications.forOwner(userId, filter),
-                Sort.by(Sort.Order.asc("transactionDate"), Sort.Order.asc("createdAt")));
-        if (rows.size() > MAX_EXPORT_ROWS) {
+        var spec = TransactionSpecifications.forOwner(userId, filter);
+        if (transactions.count(spec) > maxExportRows) {
             throw ApiException.unprocessable("EXPORT_TOO_LARGE",
-                    "The export has more than " + MAX_EXPORT_ROWS + " rows. Narrow the date range and try again.");
+                    "The export has more than " + maxExportRows + " rows. Narrow the date range and try again.");
         }
-        return rows;
+        return transactions.findAll(spec, Sort.by(Sort.Order.asc("transactionDate"), Sort.Order.asc("createdAt")));
     }
 
     @Transactional(readOnly = true)

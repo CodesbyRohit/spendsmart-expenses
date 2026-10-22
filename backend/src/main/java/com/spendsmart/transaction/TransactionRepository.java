@@ -42,6 +42,9 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID>,
     List<Transaction> findByUserIdAndCurrencyAndTypeAndTransactionDateBetweenOrderByTransactionDateAsc(
             UUID userId, String currency, TransactionType type, LocalDate from, LocalDate to);
 
+    Optional<Transaction> findFirstByUserIdAndCurrencyAndTypeAndTransactionDateBetweenOrderByAmountDescTransactionDateDesc(
+            UUID userId, String currency, TransactionType type, LocalDate from, LocalDate to);
+
     @EntityGraph(attributePaths = "category")
     List<Transaction> findByUserIdOrderByTransactionDateAscCreatedAtAsc(UUID userId);
 

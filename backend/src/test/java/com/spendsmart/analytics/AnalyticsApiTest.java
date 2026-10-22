@@ -48,7 +48,14 @@ class AnalyticsApiTest extends ApiTestSupport {
 
         List<String> rules = new ArrayList<>();
         o.get("insights").forEach(i -> rules.add(i.get("rule").asText()));
-        assertThat(rules).contains("expense-change", "savings-rate").doesNotContain("expense-change-no-baseline");
+        assertThat(rules).contains("expense-change", "savings-rate", "largest-expense")
+                .doesNotContain("expense-change-no-baseline");
+        // The largest expense comes from a top-1 query; it must be the in-range, in-currency maximum.
+        o.get("insights").forEach(i -> {
+            if (i.get("rule").asText().equals("largest-expense")) {
+                assertThat(i.get("message").asText()).contains("Rent (first day)").contains("88.2%");
+            }
+        });
     }
 
     @Test

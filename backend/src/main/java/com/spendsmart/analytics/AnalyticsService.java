@@ -28,7 +28,6 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -84,10 +83,10 @@ public class AnalyticsService {
                 RoundingMode.HALF_UP);
         BigDecimal savingsRate = current.income().signum() > 0 ? Percent.of(current.net(), current.income()) : null;
 
-        List<Transaction> expenses = transactions.findByUserIdAndCurrencyAndTypeAndTransactionDateBetweenOrderByTransactionDateAsc(
-                userId, currency, TransactionType.EXPENSE, range.from(), range.to());
-        InsightEngine.LargestExpense largest = expenses.stream()
-                .max(Comparator.comparing(Transaction::getAmount))
+        // Top-1 query: loading every expense in a (up to five-year) range just to find the maximum was unbounded.
+        InsightEngine.LargestExpense largest = transactions
+                .findFirstByUserIdAndCurrencyAndTypeAndTransactionDateBetweenOrderByAmountDescTransactionDateDesc(
+                        userId, currency, TransactionType.EXPENSE, range.from(), range.to())
                 .map(t -> new InsightEngine.LargestExpense(t.getDescription(), Money.scale(t.getAmount(), currency),
                         t.getTransactionDate()))
                 .orElse(null);
