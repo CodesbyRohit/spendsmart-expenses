@@ -47,7 +47,7 @@ Conventions used throughout:
 - **N+1 avoided**: entity graphs fetch transactions together with their categories, budget plans fetch-join their
   lines, and goal progress uses one grouped query for the whole list.
 
-### Data model (Flyway `V1__initial_schema.sql`)
+### Data model (Flyway `V1__initial_schema.sql`, `V2__user_time_zone_and_ownership_keys.sql`)
 
 ```
 users ─┬─< categories ─┬─< transactions
@@ -62,6 +62,11 @@ Integrity rules enforced by the database, not just the code:
   transaction cannot reference another user's category, or an income category for an expense.
 - `category_budgets` uses the same composite key with `category_type = 'EXPENSE'`, so budgets can only use your own
   expense categories.
+- Since V2, `category_budgets (monthly_budget_id, user_id)` → `monthly_budgets (id, user_id)` and
+  `goal_contributions (goal_id, user_id)` → `savings_goals (id, user_id)`, so a child row can never belong to a
+  different user than its parent, even through direct SQL.
+- Applied migrations are never edited. Schema changes ship as new versions, and `MigrationUpgradeTest` upgrades a V1
+  database that already holds data to the latest version on PostgreSQL 16.
 - `CHECK` constraints: positive amounts and limits; first-of-month budget periods; enumerated types, payment methods
   and themes.
 - Unique constraints: e-mail; category name per user and type; one plan per user, month and currency; one line per
@@ -69,6 +74,21 @@ Integrity rules enforced by the database, not just the code:
 
 Derived values are **never stored**: dashboard totals, budget spend and goal savings are all computed from rows. That
 leaves no second source of truth that could drift.
+
+### Dates and time zones
+
+Transaction and contribution dates are calendar dates (`DATE`) with no time component. Whenever the server needs
+"today" or "the current month", it uses `UserClock`, which evaluates the injected `Clock` in the **user's own** IANA time
+zone (`users.time_zone`, captured from the browser at registration and editable in Settings). That covers:
+
+- the "no future contributions" rule and the latest allowed transaction date;
+- budget days-left and the daily allowance;
+- which month raises alerts;
+- the dashboard's default range, the monthly series and recurring detection.
+
+Using the server's zone instead was a real defect: in the UTC Docker image, a user in UTC+05:30 couldn't record a
+contribution dated today before 05:30 local time, and on the 1st still saw last month's budget.
+`TimeZoneBoundaryTest` pins the clock to 2026-10-31T20:00Z, which is 1 November in India, to cover this.
 
 ### Money
 
@@ -109,8 +129,8 @@ amount is within ±15 % of the median.
 
 ### Budget alerts
 
-After a transaction or budget change commits, `BudgetAlertService` re-evaluates the affected **current-month**
-budgets in a separate transaction, so an alert failure can never fail or roll back the user's change. Each alert has
+After a transaction or budget change commits, `BudgetAlertService` re-evaluates the affected budgets for the
+user's **current month** (in their time zone) in a separate transaction, so an alert failure can never fail or roll back the user's change. Each alert has
 a `dedupe_key` of (line, month, level) under a unique constraint, so each line alerts at most once at the threshold
 and once when exceeded, per month.
 

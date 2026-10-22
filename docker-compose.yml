@@ -23,6 +23,7 @@ services:
 
   app:
     profiles: ["app"]
+    restart: unless-stopped
     build: .
     depends_on:
       db:

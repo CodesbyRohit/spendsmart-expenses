@@ -9,6 +9,8 @@ The base path is `/api`. A live OpenAPI 3 description is at `/api/docs/openapi.j
 - Every `POST`, `PUT` and `DELETE` must echo the `XSRF-TOKEN` cookie value in an `X-XSRF-TOKEN` header. Call
   `GET /api/auth/csrf` once to obtain the cookie.
 - Money and percentages are JSON **strings** (`"1250.50"`), and dates are `yyyy-MM-dd`. Months are `yyyy-MM`.
+- "Today" and "the current month" (defaults, date limits, alerts) are evaluated in the user's `timeZone`.
+- Resource ids are UUIDs. Path segments that aren't hex/UUID-shaped never reach `/{id}` handlers (404).
 - Errors are `application/problem+json`:
   `{ "status": 400, "code": "VALIDATION_FAILED", "detail": "...", "fieldErrors": [{ "field": "amount", "message": "..." }] }`.
   Common codes: `UNAUTHENTICATED` (401), `FORBIDDEN` / `CSRF_INVALID` (403), `NOT_FOUND` (404, also used for other
@@ -19,7 +21,7 @@ The base path is `/api`. A live OpenAPI 3 description is at `/api/docs/openapi.j
 | Method | Path | Body / params | Notes |
 | --- | --- | --- | --- |
 | GET | `/csrf` | — | sets the `XSRF-TOKEN` cookie (204) |
-| POST | `/register` | `email, password, displayName, defaultCurrency, locale` | 201 `User`, signs in, seeds default categories |
+| POST | `/register` | `email, password, displayName, defaultCurrency, locale, timeZone?` | 201 `User`, signs in, seeds default categories. `timeZone` is an IANA id from the browser; a missing or unknown value falls back to `UTC` |
 | POST | `/login` | `email, password` | 200 `User`; 401 `INVALID_CREDENTIALS`; 429 when rate-limited |
 | POST | `/logout` | — | 204 |
 | GET | `/me` | — | 200 `User` or 401 |
@@ -29,9 +31,9 @@ The base path is `/api`. A live OpenAPI 3 description is at `/api/docs/openapi.j
 | Method | Path | Body | Notes |
 | --- | --- | --- | --- |
 | GET | `/` | — | current `User` |
-| GET | `/options` | — | supported `currencies` and `locales` |
+| GET | `/options` | — | supported `currencies`, `locales` and `timeZones` |
 | PUT | `/profile` | `displayName, email, currentPassword?` | a password is required to change the email |
-| PUT | `/preferences` | `defaultCurrency, locale, theme, budgetAlertsEnabled, budgetAlertThreshold (50–100)` | |
+| PUT | `/preferences` | `defaultCurrency, locale, theme, budgetAlertsEnabled, budgetAlertThreshold (50–100), timeZone?` | `timeZone` must be a valid IANA id; omit it to keep the current one |
 | POST | `/password` | `currentPassword, newPassword` | 204; signs out other sessions |
 | GET | `/export` | — | JSON download of all account data |
 | POST | `/delete` | `password, confirmation: "DELETE"` | 204; permanently deletes everything |
@@ -41,7 +43,7 @@ The base path is `/api`. A live OpenAPI 3 description is at `/api/docs/openapi.j
 | Method | Path | Notes |
 | --- | --- | --- |
 | GET | `/` | `q, type, categoryId, currency, from, to, page (0-based), size (1–100, default 20), sort` → `Page<Transaction>`. `sort` is one of `date|amount|description|merchant|createdAt` plus `,asc` or `,desc` |
-| GET | `/export` | same filters → `text/csv` (up to 50,000 rows) |
+| GET | `/export` | same filters → `text/csv`. Any `Accept` header works. More than `app.export.max-rows` (default 50,000) matching rows → 422 `EXPORT_TOO_LARGE` |
 | GET | `/currencies` | currencies the user has transactions in |
 | GET | `/{id}` | one transaction |
 | POST | `/` | `type, amount, currency, categoryId, description, transactionDate, merchant?, paymentMethod?, notes?` → 201 |
