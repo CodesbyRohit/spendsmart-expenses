@@ -21,7 +21,10 @@ RUN --mount=type=cache,target=/root/.m2 ./mvnw -B -q -DskipTests package
 
 # --- Runtime ----------------------------------------------------------------
 FROM eclipse-temurin:21-jre
-RUN groupadd --system app && useradd --system --gid app --home /app app
+# /usr/bin/pebble (Canonical's service manager) ships unused in the Ubuntu 26.04 base image. SpendSmart never runs
+# it, but its Go stdlib CVEs fail the Trivy gate; deleting it keeps the gate meaningful without suppressing CVEs.
+RUN groupadd --system app && useradd --system --gid app --home /app app \
+    && rm -f /usr/bin/pebble
 WORKDIR /app
 COPY --from=backend /src/backend/target/spendsmart.jar /app/spendsmart.jar
 COPY --from=frontend /src/frontend/dist /app/static
