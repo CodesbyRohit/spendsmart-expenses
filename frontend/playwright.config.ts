@@ -31,7 +31,9 @@ export default defineConfig({
     {
       command:
         `${java} -jar ../backend/target/spendsmart.jar --spring.profiles.active=local ` +
-        `--spring.datasource.url=jdbc:h2:mem:e2e;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1 ` +
+        // The JDBC URL must stay quoted: its semicolons would otherwise be read as command separators by the
+        // POSIX shell Playwright uses on Linux (CI), splitting the command.
+        `--spring.datasource.url="jdbc:h2:mem:e2e;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1" ` +
         `--app.security.registration-per-ip-per-hour=200`,
       url: "http://localhost:8080/actuator/health",
       reuseExistingServer: true,
