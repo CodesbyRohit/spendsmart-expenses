@@ -94,6 +94,32 @@
         </dependency>
     </dependencies>
 
+    <profiles>
+        <!--
+          Runs the WHOLE test suite against a throwaway PostgreSQL 16 (Testcontainers JDBC URL) instead of H2:
+            ./mvnw test -Ppostgres
+          Requires a running Docker daemon. DatabaseEngineTest fails the build if the tests silently ran on H2.
+        -->
+        <profile>
+            <id>postgres</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <systemPropertyVariables>
+                                <spring.datasource.url>jdbc:tc:postgresql:16-alpine:///spendsmart</spring.datasource.url>
+                                <spring.datasource.driver-class-name>org.testcontainers.jdbc.ContainerDatabaseDriver</spring.datasource.driver-class-name>
+                                <spendsmart.test.expected-database>PostgreSQL</spendsmart.test.expected-database>
+                            </systemPropertyVariables>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+
     <build>
         <finalName>spendsmart</finalName>
         <plugins>
