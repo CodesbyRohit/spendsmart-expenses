@@ -11,7 +11,8 @@ services:
       POSTGRES_USER: ${DB_USERNAME:-spendsmart}
       POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env (see .env.example)}
     ports:
-      - "127.0.0.1:5432:5432"
+      # Host port is configurable in case another PostgreSQL already uses 5432.
+      - "127.0.0.1:${DB_PORT:-5432}:5432"
     volumes:
       - spendsmart-pg:/var/lib/postgresql/data
     healthcheck:
@@ -34,7 +35,7 @@ services:
       # Plain http://localhost cannot carry Secure cookies. Behind HTTPS in real deployments, leave this true.
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
     ports:
-      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:${APP_PORT:-8080}:8080"
 
 volumes:
   spendsmart-pg:

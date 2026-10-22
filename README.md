@@ -91,6 +91,8 @@ sees a single origin.
    ```bash
    docker compose up -d db
    ```
+   If another PostgreSQL already uses port 5432, set `DB_PORT=5433` in `.env` and use the same port in `DB_URL`.
+   `APP_PORT` does the same for the application container.
 3. Run the backend with the `dev` profile (the default). It reads `DB_URL`, `DB_USERNAME` and `DB_PASSWORD` from the
    environment:
    ```powershell
@@ -114,9 +116,8 @@ The image builds the React app and serves it from Spring Boot on the same origin
 cookies, API explorer off). On plain `http://localhost`, compose sets `COOKIE_SECURE=false`; behind HTTPS, leave it
 `true`.
 
-> The Dockerfile and compose file were written for this repository but **not built during development**, because
-> the Docker daemon was not running on the development machine. The single-origin mode the image relies on (the jar
-> serving `frontend/dist` through `APP_STATIC_DIR`) *was* verified by running the jar directly.
+Verified on 2026-10-22 (Docker Engine 29.8.2): the image builds, the container reports `healthy`, Flyway applies V1 to
+an empty PostgreSQL 16.14 database, and the Playwright suite passes against `http://localhost:8080` (see Tests).
 
 ## Profiles
 
@@ -145,15 +146,15 @@ Sample data is never created automatically.
 
 | Suite | Command | Result on 2026-10-22 |
 | --- | --- | --- |
-| Backend (unit, MockMvc API, repository, auth, isolation) | `cd backend && ./mvnw test` (`.\mvnw.cmd test`) | **89 run, 0 failed, 1 skipped** |
+| Backend (unit, MockMvc API, repository, auth, isolation, PostgreSQL migration) | `cd backend && ./mvnw test` (`.\mvnw.cmd test`) | **89 run, 0 failed, 0 skipped** (Docker running) |
 | Frontend unit/component | `cd frontend && npm test` | **28 passed** (7 files) |
 | Frontend typecheck + production build | `cd frontend && npm run build` | passed |
-| End-to-end (real backend + browser) | see below | **6 passed** (desktop + mobile projects) |
+| End-to-end, dev stack (jar + H2 + Vite) | `cd frontend && npm run e2e` | **6 passed** (desktop + mobile projects) |
+| End-to-end, Docker image + PostgreSQL 16 | `docker compose --profile app up -d --build`, then `E2E_BASE_URL=http://localhost:8080 npx playwright test` | **6 passed** |
 
-The skipped backend test is `PostgresMigrationTest`. It applies every migration to a real PostgreSQL 16 through
-Testcontainers, and it skips itself when Docker isn't available, which was the case here. **Migrations have
-therefore been verified on H2 (PostgreSQL mode) but not yet on a real PostgreSQL server.** Start Docker and run
-`./mvnw test` to verify them.
+`PostgresMigrationTest` applies every migration to a fresh PostgreSQL 16 started by Testcontainers and lets Hibernate
+validate the entities against it. It needs a running Docker daemon and **skips itself** (it does not fail) without
+one, so check the summary says `Skipped: 0` when you rely on it.
 
 **End-to-end tests**
 
@@ -206,4 +207,3 @@ docs/                   ARCHITECTURE.md, SECURITY.md, API.md, IMPLEMENTATION_PLA
 - **No recurring-transaction scheduler.** Regular payments are *detected* in your history, not created
   automatically.
 - **No password reset by email**, because no email provider is configured.
-- **PostgreSQL migration not run during development** (see Tests above).
