@@ -70,15 +70,16 @@ jobs:
       - run: npm run e2e
         working-directory: frontend
 
-  image:
-    name: Docker image build and scan
+  dependencies:
+    name: Backend dependency scan (Trivy)
     runs-on: ubuntu-latest
-    needs: [backend]
     steps:
       - uses: actions/checkout@v4
-      - run: docker build -t spendsmart:ci .
-      # Fails on HIGH/CRITICAL findings that have a fix, except entries justified in .trivyignore.
+      # Same pinned Trivy version and same gate as the previous image scan (HIGH/CRITICAL findings with a fix
+      # available, minus the entries justified in .trivyignore), applied to the source tree instead of a
+      # container image: production deploys a plain jar on a Java host, so the image build is not part of CI.
       - run: >
-          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD/.trivyignore:/.trivyignore:ro"
-          aquasec/trivy:0.76.1 image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed
-          --ignorefile /.trivyignore --exit-code 1 spendsmart:ci
+          docker run --rm -v "$PWD:/src:ro" -v "$PWD/.trivyignore:/.trivyignore:ro"
+          -v trivy-cache:/root/.trivy-cache
+          aquasec/trivy:0.76.1 fs --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed
+          --ignorefile /.trivyignore --exit-code 1 /src/backend

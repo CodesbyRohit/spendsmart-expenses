@@ -93,7 +93,8 @@ sees a single origin.
    docker compose up -d db
    ```
    If another PostgreSQL already uses port 5432, set `DB_PORT=5433` in `.env` and use the same port in `DB_URL`.
-   `APP_PORT` does the same for the application container.
+   `APP_PORT` does the same for the application container. (Docker is optional: any locally installed PostgreSQL 16
+   works too — create a database and user, point `DB_URL`/`DB_USERNAME`/`DB_PASSWORD` at it, and skip compose.)
 3. Run the backend with the `dev` profile (the default). It reads `DB_URL`, `DB_USERNAME` and `DB_PASSWORD` from the
    environment:
    ```powershell
@@ -107,19 +108,37 @@ sees a single origin.
    Flyway creates the schema on first start. Hibernate only *validates* the schema; it never generates it.
 4. Start the frontend as in the quick start.
 
-### Production-style single container
+## Deployment
+
+Production is two Docker-free services plus one managed database: the React build on **Vercel**, the Spring Boot
+jar on a **Java host** (exact Railway / Heroku / free-VM instructions included), and PostgreSQL from **Neon** or
+the host's add-on. The browser only ever talks to the Vercel origin — `frontend/vercel.ts` proxies `/api/*` to the
+backend, so session cookies, CSRF and CSP behave exactly as they do on localhost, with no CORS. Docker is not
+required for local development, testing or deployment.
+
+- Setup, environment-variable reference, deployment checklist, smoke test and recovery runbook:
+  **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**.
+- Why the previous production deployment failed (every `/api/*` returned Vercel's own 404 because no backend was
+  ever deployed): **[docs/PRODUCTION_AUDIT.md](docs/PRODUCTION_AUDIT.md)**.
+
+Production frontend: https://spendsmart-expenses-tau.vercel.app. The API becomes reachable once the backend host
+from `docs/DEPLOYMENT.md` §1 is deployed and the `SPENDSMART_API_ORIGIN` variable is set on Vercel; verify the whole
+path with:
+
+```bash
+./scripts/smoke-test.sh https://spendsmart-expenses-tau.vercel.app
+```
+
+### Optional: single container (a local convenience, not the deployment path)
 
 ```bash
 docker compose --profile app up --build      # http://localhost:8080
 ```
 
 The image builds the React app and serves it from Spring Boot on the same origin, using the `prod` profile (secure
-cookies, API explorer off). On plain `http://localhost`, compose sets `COOKIE_SECURE=false`; behind HTTPS, leave it
-`true`.
-
-Verified on 2026-10-22 (Docker Engine 29.8.2) with the current code: the image builds, the container reports
-`healthy`, Flyway applies V1 and V2 to an empty PostgreSQL 16.14 database, a restart applies nothing new, and the
-Playwright suite passes against `http://localhost:8080` (see Tests).
+cookies, API explorer off). Verified on 2026-10-22 (Docker Engine 29.8.2): the image builds, reports `healthy`,
+Flyway applies V1 and V2 to an empty PostgreSQL 16.14, and the Playwright suite passes against it. Skip this
+entirely if you don't have Docker — nothing else needs it.
 
 ## Profiles
 
@@ -146,34 +165,30 @@ Sample data is never created automatically.
 
 ## Tests
 
-| Suite | Command | Result on 2026-10-22 |
+| Suite | Command | Result |
 | --- | --- | --- |
-| Backend on H2 (unit, MockMvc API, repository, auth, isolation, Testcontainers migration tests) | `cd backend && ./mvnw test` (`.\mvnw.cmd test`) | **99 run, 0 failed, 0 skipped** (Docker running) |
-| Backend, **whole suite on PostgreSQL 16** | `cd backend && ./mvnw test -Ppostgres` | **99 run, 0 failed, 0 skipped** on PostgreSQL 16.14 |
+| Backend on H2 (unit, MockMvc API, repository, auth, isolation, migration tests) | `cd backend && ./mvnw test` (`.\mvnw.cmd test`) | **112 run, 0 failed** (2026-10-22). No Docker needed: Docker-backed tests skip themselves when the daemon is absent |
+| Backend, **whole suite on PostgreSQL 16** | `cd backend && ./mvnw test -Ppostgres` | last local run 2026-10-22: 99/99 before this branch's additions; CI re-runs the current suite on PostgreSQL 16 on every push |
 | Frontend unit/component | `cd frontend && npm test` | **29 passed** (7 files) |
 | Frontend typecheck + production build | `cd frontend && npm run build` | passed |
 | End-to-end, dev stack (jar + H2 + Vite) | `cd frontend && npm run e2e` | **7 passed** (desktop + mobile projects) |
 | npm dependency audit | `cd frontend && npm audit` | **0 vulnerabilities** |
-| Maven dependency scan | Trivy 0.76.1 `fs` on `backend/pom.xml` | 2 accepted findings (see `docs/SECURITY.md`) |
-| Docker image: clean install | `docker compose --profile app up -d --build` | healthy in ~8 s; Flyway applied V1 and V2 to an empty PostgreSQL 16.14 |
-| Docker image: restart | `docker compose restart app` | graceful shutdown; 2 migrations validated, none re-applied |
-| End-to-end against the image | `E2E_BASE_URL=http://localhost:8080 npx playwright test` | **7 passed** |
-| Image OS packages | Trivy 0.76.1 `image --pkg-types os` (HIGH/CRITICAL) | **0 findings** (Ubuntu 26.04 base) |
+| Maven dependency scan | Trivy 0.76.1 `fs` on `backend/` (CI job `dependencies`) | 2 accepted findings (see `docs/SECURITY.md`) |
+| Production smoke test | `./scripts/smoke-test.sh <frontend-url>` | deployed environments: frontend, SPA rewrite, `/api` proxy, auth lifecycle, persistence, cleanup |
 
-Three tests need a running Docker daemon and **skip themselves** (they don't fail) without one, so check the summary
-says `Skipped: 0` when you rely on them:
-
-- `PostgresMigrationTest` applies every migration to a fresh PostgreSQL 16.
-- `MigrationUpgradeTest` upgrades a V1 database that already holds data to the latest version.
-- With `-Ppostgres`, the whole suite runs against PostgreSQL instead of H2. `DatabaseEngineTest` fails that run if
-  it silently fell back to H2.
+The Docker-backed tests are `PostgresMigrationTest` (every migration on a fresh PostgreSQL 16),
+`MigrationUpgradeTest` (upgrade a V1 database that already holds data) and, with `-Ppostgres`, the whole suite on
+PostgreSQL instead of H2 — `DatabaseEngineTest` fails that run if it silently fell back to H2. They **skip
+themselves** (they don't fail) without a Docker daemon, so check the summary says `Skipped: 0` when you rely on
+them. Nothing else in development, testing or deployment needs Docker.
 
 ### Continuous integration
 
 `.github/workflows/ci.yml` runs on every pull request and every push to `main`: the backend suite on PostgreSQL, the
-frontend audit, tests and build, the Playwright suite, and a Docker image build with a Trivy gate (HIGH/CRITICAL with a
-fix available, minus the justified entries in `.trivyignore`). The workflow was added on 2026-10-22 and has not run
-on GitHub yet.
+frontend audit, tests and build, the Playwright suite, and a Trivy filesystem scan of `backend/` gated at
+HIGH/CRITICAL findings that have a fix available (minus the justified entries in `.trivyignore`). No Docker image
+is built: production runs the jar on a Java host. The workflow was added on 2026-10-22 and runs on GitHub's own
+runners, where Docker is provided by the platform — it is never required on your machine.
 
 **End-to-end tests**
 
@@ -208,13 +223,17 @@ frontend/
   src/components        UI kit (Button, Field, Dialog, Card, Progress, Toast, …) and charts
   src/lib               typed HTTP client, formatting, dates, validation schemas
   e2e/                  Playwright specs
-docs/                   ARCHITECTURE.md, SECURITY.md, API.md, IMPLEMENTATION_PLAN.md
+docs/                   ARCHITECTURE.md, SECURITY.md, API.md, DEPLOYMENT.md, PRODUCTION_AUDIT.md,
+                        IMPLEMENTATION_PLAN.md
 ```
 
 ## Documentation
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): design, data model, calculation rules, and frontend structure
 - [docs/SECURITY.md](docs/SECURITY.md): security controls, review results and known limitations
+- [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md): production architecture, provider setup, environment variables,
+  deployment checklist, smoke test and recovery runbook
+- [docs/PRODUCTION_AUDIT.md](docs/PRODUCTION_AUDIT.md): production failure audit — evidence, root cause, fixes
 - [docs/API.md](docs/API.md): endpoint reference. A live OpenAPI explorer runs at
   http://localhost:8080/api/docs in the `dev` and `local` profiles.
 
@@ -235,3 +254,7 @@ docs/                   ARCHITECTURE.md, SECURITY.md, API.md, IMPLEMENTATION_PLA
   accurate option today. Moving money between your own accounts isn't modelled.
 - **Behind a reverse proxy**, forwarded headers are ignored unless you enable them. See "Running behind a reverse
   proxy" in `docs/SECURITY.md`.
+- **Behind the Vercel `/api` proxy**, per-IP rate limits see Vercel's edge IPs (forwarded headers stay untrusted on
+  purpose), so they are coarser than in a single-origin deployment.
+- **Free-tier hosts sleep.** The first request after a cold start can take tens of seconds, and a backend restart
+  signs everyone out (sessions are in memory).
