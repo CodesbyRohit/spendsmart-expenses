@@ -5,10 +5,9 @@ import com.spendsmart.analytics.AnalyticsDtos.Overview;
 import com.spendsmart.analytics.AnalyticsDtos.RecurringPattern;
 import com.spendsmart.common.DateRange;
 import com.spendsmart.security.AuthenticatedUser;
+import com.spendsmart.user.UserClock;
 import com.spendsmart.user.UserLookup;
-import java.time.Clock;
 import java.time.LocalDate;
-import java.time.YearMonth;
 import java.util.List;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -24,13 +23,14 @@ public class AnalyticsController {
     private final AnalyticsService analytics;
     private final DashboardService dashboard;
     private final UserLookup userLookup;
-    private final Clock clock;
+    private final UserClock userClock;
 
-    public AnalyticsController(AnalyticsService analytics, DashboardService dashboard, UserLookup userLookup, Clock clock) {
+    public AnalyticsController(AnalyticsService analytics, DashboardService dashboard, UserLookup userLookup,
+                               UserClock userClock) {
         this.analytics = analytics;
         this.dashboard = dashboard;
         this.userLookup = userLookup;
-        this.clock = clock;
+        this.userClock = userClock;
     }
 
     /** Defaults to the current calendar month and the user's default currency. */
@@ -40,7 +40,7 @@ public class AnalyticsController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(required = false) String currency) {
-        return dashboard.build(user.id(), rangeOrCurrentMonth(from, to), currency);
+        return dashboard.build(user.id(), rangeOrCurrentMonth(user, from, to), currency);
     }
 
     @GetMapping("/analytics/overview")
@@ -49,7 +49,7 @@ public class AnalyticsController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(required = false) String currency) {
-        return analytics.overview(user.id(), rangeOrCurrentMonth(from, to), currencyOrDefault(user, currency));
+        return analytics.overview(user.id(), rangeOrCurrentMonth(user, from, to), currencyOrDefault(user, currency));
     }
 
     @GetMapping("/analytics/monthly")
@@ -65,9 +65,10 @@ public class AnalyticsController {
         return analytics.recurring(user.id(), currencyOrDefault(user, currency), null);
     }
 
-    private DateRange rangeOrCurrentMonth(LocalDate from, LocalDate to) {
+    /** Defaults to the current calendar month in the user's own time zone. */
+    private DateRange rangeOrCurrentMonth(AuthenticatedUser user, LocalDate from, LocalDate to) {
         if (from == null && to == null) {
-            return DateRange.of(YearMonth.now(clock));
+            return DateRange.of(userClock.currentMonth(userLookup.require(user.id())));
         }
         return new DateRange(from, to);
     }

@@ -86,6 +86,9 @@ public class AccountService {
         user.setTheme(request.theme());
         user.setBudgetAlertsEnabled(request.budgetAlertsEnabled());
         user.setBudgetAlertThreshold(request.budgetAlertThreshold());
+        if (request.timeZone() != null) {
+            user.setTimeZone(UserClock.requireZone(request.timeZone(), "timeZone"));
+        }
         return UserResponse.of(users.saveAndFlush(user));
     }
 

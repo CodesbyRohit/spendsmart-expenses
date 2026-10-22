@@ -11,9 +11,10 @@ import com.spendsmart.goal.GoalDtos.ContributionResponse;
 import com.spendsmart.goal.GoalDtos.CreateGoalRequest;
 import com.spendsmart.goal.GoalDtos.GoalResponse;
 import com.spendsmart.goal.GoalDtos.UpdateGoalRequest;
+import com.spendsmart.user.UserClock;
+import com.spendsmart.user.UserLookup;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.Clock;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -30,12 +31,20 @@ public class GoalService {
 
     private final SavingsGoalRepository goals;
     private final GoalContributionRepository contributions;
-    private final Clock clock;
+    private final UserLookup userLookup;
+    private final UserClock userClock;
 
-    public GoalService(SavingsGoalRepository goals, GoalContributionRepository contributions, Clock clock) {
+    public GoalService(SavingsGoalRepository goals, GoalContributionRepository contributions, UserLookup userLookup,
+                       UserClock userClock) {
         this.goals = goals;
         this.contributions = contributions;
-        this.clock = clock;
+        this.userLookup = userLookup;
+        this.userClock = userClock;
+    }
+
+    /** "Today" in the user's own time zone (see UserClock). */
+    private LocalDate today(UUID userId) {
+        return userClock.today(userLookup.require(userId));
     }
 
     @Transactional(readOnly = true)
@@ -46,10 +55,11 @@ public class GoalService {
         }
         Map<UUID, GoalSaved> saved = contributions.savedAmounts(userId, all.stream().map(SavingsGoal::getId).toList())
                 .stream().collect(Collectors.toMap(GoalSaved::getGoalId, Function.identity()));
+        LocalDate today = today(userId);
         return all.stream().map(g -> {
             GoalSaved s = saved.get(g.getId());
             return toResponse(g, s == null ? BigDecimal.ZERO : s.getSaved(), s == null ? 0 : s.getCount(),
-                    s == null ? null : s.getLastDate());
+                    s == null ? null : s.getLastDate(), today);
         }).toList();
     }
 
@@ -62,12 +72,13 @@ public class GoalService {
     public GoalResponse create(UUID userId, CreateGoalRequest request) {
         String currency = Money.requireCurrency(request.currency(), "currency");
         SavingsGoal goal = new SavingsGoal(userId, currency, false);
-        apply(goal, request.name(), request.targetAmount(), request.targetDate(), request.notes());
+        LocalDate today = today(userId);
+        apply(goal, request.name(), request.targetAmount(), request.targetDate(), request.notes(), today);
         SavingsGoal saved = goals.saveAndFlush(goal);
         if (request.initialAmount() != null && request.initialAmount().signum() != 0) {
             BigDecimal initial = Money.requirePositiveAmount(request.initialAmount(), currency, "initialAmount");
             contributions.save(new GoalContribution(saved.getId(), userId, GoalContribution.Type.DEPOSIT, initial,
-                    LocalDate.now(clock), "Amount already saved when the goal was created"));
+                    today, "Amount already saved when the goal was created"));
         }
         return response(userId, saved);
     }
@@ -78,7 +89,7 @@ public class GoalService {
         if (request.version() != goal.getVersion()) {
             throw new ObjectOptimisticLockingFailureException(SavingsGoal.class, id);
         }
-        apply(goal, request.name(), request.targetAmount(), request.targetDate(), request.notes());
+        apply(goal, request.name(), request.targetAmount(), request.targetDate(), request.notes(), today(userId));
         return response(userId, goals.saveAndFlush(goal));
     }
 
@@ -102,7 +113,7 @@ public class GoalService {
         // Locking the goal row serialises contributions so two withdrawals cannot overdraw it together.
         SavingsGoal goal = goals.lockByIdAndUserId(goalId, userId).orElseThrow(() -> ApiException.notFound("Savings goal"));
         BigDecimal amount = Money.requirePositiveAmount(request.amount(), goal.getCurrency(), "amount");
-        if (request.date().isAfter(LocalDate.now(clock))) {
+        if (request.date().isAfter(today(userId))) {
             throw new FieldValidationException("date", "Contributions can't be dated in the future.");
         }
         if (request.type() == GoalContribution.Type.WITHDRAWAL) {
@@ -138,14 +149,15 @@ public class GoalService {
         return goals.findByIdAndUserId(id, userId).orElseThrow(() -> ApiException.notFound("Savings goal"));
     }
 
-    private void apply(SavingsGoal goal, String rawName, BigDecimal target, LocalDate targetDate, String notes) {
+    private void apply(SavingsGoal goal, String rawName, BigDecimal target, LocalDate targetDate, String notes,
+                       LocalDate today) {
         String name = Text.clean(rawName);
         if (name == null) {
             throw new FieldValidationException("name", "Enter a goal name.");
         }
         goal.setName(name);
         goal.setTargetAmount(Money.requirePositiveAmount(target, goal.getCurrency(), "targetAmount"));
-        if (targetDate != null && targetDate.isAfter(LocalDate.now(clock).plusYears(100))) {
+        if (targetDate != null && targetDate.isAfter(today.plusYears(100))) {
             throw new FieldValidationException("targetDate", "Choose a date within the next 100 years.");
         }
         goal.setTargetDate(targetDate);
@@ -156,16 +168,15 @@ public class GoalService {
         List<GoalSaved> rows = contributions.savedAmounts(userId, List.of(goal.getId()));
         GoalSaved s = rows.isEmpty() ? null : rows.getFirst();
         return toResponse(goal, s == null ? BigDecimal.ZERO : s.getSaved(), s == null ? 0 : s.getCount(),
-                s == null ? null : s.getLastDate());
+                s == null ? null : s.getLastDate(), today(userId));
     }
 
-    GoalResponse toResponse(SavingsGoal g, BigDecimal savedRaw, long count, LocalDate lastDate) {
+    GoalResponse toResponse(SavingsGoal g, BigDecimal savedRaw, long count, LocalDate lastDate, LocalDate today) {
         String currency = g.getCurrency();
         BigDecimal saved = Money.scale(savedRaw, currency);
         BigDecimal target = Money.scale(g.getTargetAmount(), currency);
         BigDecimal remaining = target.subtract(saved).max(Money.scale(BigDecimal.ZERO, currency));
         BigDecimal percent = Percent.of(saved, target);
-        LocalDate today = LocalDate.now(clock);
         BigDecimal monthlyNeeded = null;
         Long daysLeft = null;
         if (g.getTargetDate() != null) {

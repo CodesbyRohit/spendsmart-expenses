@@ -11,7 +11,8 @@ import com.spendsmart.common.SpendingChangedEvent.Period;
 import com.spendsmart.common.Text;
 import com.spendsmart.transaction.TransactionDtos.TransactionRequest;
 import com.spendsmart.transaction.TransactionDtos.TransactionResponse;
-import java.time.Clock;
+import com.spendsmart.user.UserClock;
+import com.spendsmart.user.UserLookup;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.HashSet;
@@ -46,14 +47,16 @@ public class TransactionService {
     private final TransactionRepository transactions;
     private final CategoryService categoryService;
     private final ApplicationEventPublisher events;
-    private final Clock clock;
+    private final UserLookup userLookup;
+    private final UserClock userClock;
 
     public TransactionService(TransactionRepository transactions, CategoryService categoryService,
-                              ApplicationEventPublisher events, Clock clock) {
+                              ApplicationEventPublisher events, UserLookup userLookup, UserClock userClock) {
         this.transactions = transactions;
         this.categoryService = categoryService;
         this.events = events;
-        this.clock = clock;
+        this.userLookup = userLookup;
+        this.userClock = userClock;
     }
 
     @Transactional(readOnly = true)
@@ -131,7 +134,7 @@ public class TransactionService {
         if (description == null) {
             throw new FieldValidationException("description", "Enter a description.");
         }
-        LocalDate latest = LocalDate.now(clock).plusYears(1);
+        LocalDate latest = userClock.today(userLookup.require(userId)).plusYears(1);
         if (request.transactionDate().isBefore(EARLIEST_DATE) || request.transactionDate().isAfter(latest)) {
             throw new FieldValidationException("transactionDate", "Choose a date between 1970 and one year from today.");
         }

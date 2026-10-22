@@ -52,7 +52,8 @@ public class AccountController {
     /** Options for the settings forms, so the frontend never hard-codes a list the server would reject. */
     @GetMapping("/options")
     public Map<String, List<String>> options() {
-        return Map.of("currencies", Money.SUPPORTED_CURRENCIES, "locales", Locales.SUPPORTED);
+        return Map.of("currencies", Money.SUPPORTED_CURRENCIES, "locales", Locales.SUPPORTED,
+                "timeZones", UserClock.SUPPORTED_ZONES);
     }
 
     @PutMapping("/profile")

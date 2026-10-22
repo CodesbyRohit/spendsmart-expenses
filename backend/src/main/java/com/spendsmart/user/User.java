@@ -50,6 +50,10 @@ public class User {
     @Column(name = "budget_alert_threshold", nullable = false)
     private int budgetAlertThreshold = 80;
 
+    /** IANA zone id used for "today" and "the current month"; see UserClock. */
+    @Column(name = "time_zone", nullable = false, length = 64)
+    private String timeZone = UserClock.DEFAULT_ZONE;
+
     @Column(name = "credential_version", nullable = false)
     private int credentialVersion;
 
@@ -142,6 +146,14 @@ public class User {
 
     public void setBudgetAlertThreshold(int budgetAlertThreshold) {
         this.budgetAlertThreshold = budgetAlertThreshold;
+    }
+
+    public String getTimeZone() {
+        return timeZone;
+    }
+
+    public void setTimeZone(String timeZone) {
+        this.timeZone = timeZone;
     }
 
     public int getCredentialVersion() {

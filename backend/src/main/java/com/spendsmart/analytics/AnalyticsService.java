@@ -21,10 +21,10 @@ import com.spendsmart.transaction.TransactionRepository.CategoryTotal;
 import com.spendsmart.transaction.TransactionRepository.DailyTotal;
 import com.spendsmart.transaction.TransactionRepository.TypeTotal;
 import com.spendsmart.user.User;
+import com.spendsmart.user.UserClock;
 import com.spendsmart.user.UserLookup;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.Clock;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
@@ -50,14 +50,14 @@ public class AnalyticsService {
     private final TransactionRepository transactions;
     private final BudgetService budgetService;
     private final UserLookup userLookup;
-    private final Clock clock;
+    private final UserClock userClock;
 
     public AnalyticsService(TransactionRepository transactions, BudgetService budgetService, UserLookup userLookup,
-                            Clock clock) {
+                            UserClock userClock) {
         this.transactions = transactions;
         this.budgetService = budgetService;
         this.userLookup = userLookup;
-        this.clock = clock;
+        this.userClock = userClock;
     }
 
     @Transactional(readOnly = true)
@@ -107,7 +107,7 @@ public class AnalyticsService {
     public List<MonthPoint> monthly(UUID userId, String rawCurrency, int months) {
         String currency = Money.requireCurrency(rawCurrency, "currency");
         int span = Math.max(2, Math.min(months, 24));
-        YearMonth last = YearMonth.now(clock);
+        YearMonth last = userClock.currentMonth(userLookup.require(userId));
         YearMonth first = last.minusMonths(span - 1L);
         // One extra month before the window, so the first point also has a month-over-month comparison.
         YearMonth baseline = first.minusMonths(1);
@@ -133,7 +133,7 @@ public class AnalyticsService {
     @Transactional(readOnly = true)
     public List<RecurringPattern> recurring(UUID userId, String rawCurrency, LocalDate asOf) {
         String currency = Money.requireCurrency(rawCurrency, "currency");
-        LocalDate end = asOf == null ? LocalDate.now(clock) : asOf;
+        LocalDate end = asOf == null ? userClock.today(userLookup.require(userId)) : asOf;
         List<Transaction> expenses = transactions.findByUserIdAndCurrencyAndTypeAndTransactionDateBetweenOrderByTransactionDateAsc(
                 userId, currency, TransactionType.EXPENSE, end.minusDays(RECURRING_LOOKBACK_DAYS), end);
         return RecurringDetector.detect(expenses, currency);
@@ -146,7 +146,7 @@ public class AnalyticsService {
     @Transactional(readOnly = true)
     public BudgetMonthResponse budgetForRange(UUID userId, DateRange range, String currency) {
         YearMonth month = YearMonth.from(range.to());
-        YearMonth now = YearMonth.now(clock);
+        YearMonth now = userClock.currentMonth(userLookup.require(userId));
         if (month.isAfter(now)) {
             month = now;
         }

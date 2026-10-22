@@ -30,7 +30,9 @@ public final class AccountDtos {
             @NotNull(message = "Choose a theme.") Theme theme,
             @NotNull Boolean budgetAlertsEnabled,
             @NotNull @Min(value = 50, message = "Threshold must be between 50% and 100%.")
-            @Max(value = 100, message = "Threshold must be between 50% and 100%.") Integer budgetAlertThreshold) {
+            @Max(value = 100, message = "Threshold must be between 50% and 100%.") Integer budgetAlertThreshold,
+            /* IANA zone id; null leaves the current zone unchanged. */
+            @Size(max = 64) String timeZone) {
     }
 
     public record ChangePasswordRequest(

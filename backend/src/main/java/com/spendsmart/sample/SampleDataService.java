@@ -17,10 +17,10 @@ import com.spendsmart.transaction.PaymentMethod;
 import com.spendsmart.transaction.Transaction;
 import com.spendsmart.transaction.TransactionRepository;
 import com.spendsmart.user.User;
+import com.spendsmart.user.UserClock;
 import com.spendsmart.user.UserLookup;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.Clock;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
@@ -56,12 +56,12 @@ public class SampleDataService {
     private final SavingsGoalRepository goals;
     private final GoalContributionRepository contributions;
     private final UserLookup userLookup;
-    private final Clock clock;
+    private final UserClock userClock;
 
     public SampleDataService(TransactionRepository transactions, CategoryRepository categories,
                              MonthlyBudgetRepository budgets, CategoryBudgetRepository categoryBudgets,
                              SavingsGoalRepository goals, GoalContributionRepository contributions,
-                             UserLookup userLookup, Clock clock) {
+                             UserLookup userLookup, UserClock userClock) {
         this.transactions = transactions;
         this.categories = categories;
         this.budgets = budgets;
@@ -69,7 +69,7 @@ public class SampleDataService {
         this.goals = goals;
         this.contributions = contributions;
         this.userLookup = userLookup;
-        this.clock = clock;
+        this.userClock = userClock;
     }
 
     @Transactional(readOnly = true)
@@ -89,7 +89,7 @@ public class SampleDataService {
         User user = userLookup.require(userId);
         String currency = user.getDefaultCurrency();
         Generator g = new Generator(userId, currency, categoryLookup(userId));
-        LocalDate today = LocalDate.now(clock);
+        LocalDate today = userClock.today(user);
         YearMonth current = YearMonth.from(today);
         Random random = new Random(42); // fixed seed: the same sample every time
 

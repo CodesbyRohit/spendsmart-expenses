@@ -23,6 +23,15 @@ const LOCALES: Record<string, string> = {
 };
 export { CURRENCIES as SUPPORTED_CURRENCIES, LOCALES as LOCALE_LABELS };
 
+/** The browser's IANA zone, so "today" on the server matches the user's calendar. */
+function browserTimeZone(): string | undefined {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function guessLocale(): string {
   const nav = typeof navigator !== "undefined" ? navigator.language : "en-IN";
   return LOCALES[nav] ? nav : "en-IN";
@@ -145,7 +154,7 @@ export function RegisterPage() {
   const onSubmit = handleSubmit(async (values) => {
     setFormError(null);
     try {
-      await signUp({ ...values, email: values.email.trim(), displayName: values.displayName.trim() });
+      await signUp({ ...values, email: values.email.trim(), displayName: values.displayName.trim(), timeZone: browserTimeZone() });
       navigate("/", { replace: true });
     } catch (e) {
       setFormError(applyServerErrors(e, setError, ["displayName", "email", "password", "defaultCurrency", "locale"]));

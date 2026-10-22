@@ -15,7 +15,9 @@ public final class AuthDtos {
             @NotBlank(message = "Choose a password.") @Size(max = 128, message = "Password is too long.") String password,
             @NotBlank(message = "Enter your name.") @Size(max = 80, message = "Name can be at most 80 characters.") String displayName,
             @NotBlank(message = "Choose a currency.") String defaultCurrency,
-            @NotBlank(message = "Choose a format.") String locale) {
+            @NotBlank(message = "Choose a format.") String locale,
+            /* Browser-detected IANA zone; optional, unknown values fall back to UTC (the user can't fix a hidden field). */
+            @Size(max = 64) String timeZone) {
 
         @Override
         public String toString() {
