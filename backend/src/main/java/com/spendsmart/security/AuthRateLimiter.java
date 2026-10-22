@@ -8,13 +8,15 @@ import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
 /**
  * In-memory sliding-window limiter for sign-in and registration.
- * Limits: N failed sign-ins per email, 5×N per client IP, and M registrations per IP per hour.
+ * Limits: N failed sign-ins per email, 5×N per client IP, N failed password re-confirmations per account,
+ * and M registrations per IP per hour.
  * Single-instance only — a multi-instance deployment needs a shared store (documented in SECURITY.md).
  */
 @Component
@@ -44,6 +46,15 @@ public class AuthRateLimiter {
 
     public void recordLoginSuccess(String email) {
         events.remove("login-email:" + email);
+    }
+
+    /** Re-authentication inside a session (password change, email change, account deletion). */
+    public void checkPasswordConfirmation(UUID userId) {
+        check("reauth-user:" + userId, config.loginMaxFailures(), config.loginLockout());
+    }
+
+    public void recordPasswordConfirmationFailure(UUID userId) {
+        record("reauth-user:" + userId);
     }
 
     public void checkAndRecordRegistration(String ip) {

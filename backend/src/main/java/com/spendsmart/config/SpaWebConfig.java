@@ -7,6 +7,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
+import org.springframework.web.servlet.config.annotation.ViewControllerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import org.springframework.web.servlet.resource.PathResourceResolver;
 
@@ -21,6 +22,15 @@ public class SpaWebConfig implements WebMvcConfigurer {
 
     public SpaWebConfig(AppProperties properties) {
         this.properties = properties;
+    }
+
+    /** The resource handler never sees the empty root path, so "/" is forwarded to the app explicitly. */
+    @Override
+    public void addViewControllers(ViewControllerRegistry registry) {
+        String dir = properties.web().staticDir();
+        if (dir != null && !dir.isBlank()) {
+            registry.addViewController("/").setViewName("forward:/index.html");
+        }
     }
 
     @Override

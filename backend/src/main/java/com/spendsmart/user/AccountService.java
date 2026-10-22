@@ -10,6 +10,7 @@ import com.spendsmart.common.Text;
 import com.spendsmart.goal.GoalContributionRepository;
 import com.spendsmart.goal.SavingsGoalRepository;
 import com.spendsmart.notification.NotificationRepository;
+import com.spendsmart.security.AuthRateLimiter;
 import com.spendsmart.security.AuthenticatedUser;
 import com.spendsmart.transaction.TransactionRepository;
 import com.spendsmart.user.AccountDtos.ChangePasswordRequest;
@@ -38,12 +39,13 @@ public class AccountService {
     private final SavingsGoalRepository goals;
     private final GoalContributionRepository contributions;
     private final NotificationRepository notifications;
+    private final AuthRateLimiter rateLimiter;
 
     public AccountService(UserRepository users, UserLookup userLookup, PasswordEncoder passwordEncoder,
                           TransactionRepository transactions, CategoryRepository categories,
                           MonthlyBudgetRepository budgets, CategoryBudgetRepository categoryBudgets,
                           SavingsGoalRepository goals, GoalContributionRepository contributions,
-                          NotificationRepository notifications) {
+                          NotificationRepository notifications, AuthRateLimiter rateLimiter) {
         this.users = users;
         this.userLookup = userLookup;
         this.passwordEncoder = passwordEncoder;
@@ -54,6 +56,7 @@ public class AccountService {
         this.goals = goals;
         this.contributions = contributions;
         this.notifications = notifications;
+        this.rateLimiter = rateLimiter;
     }
 
     @Transactional
@@ -127,7 +130,9 @@ public class AccountService {
     }
 
     private void requirePassword(User user, String password, String field) {
+        rateLimiter.checkPasswordConfirmation(user.getId());
         if (password == null || password.isEmpty() || !passwordEncoder.matches(password, user.getPasswordHash())) {
+            rateLimiter.recordPasswordConfirmationFailure(user.getId());
             throw new FieldValidationException(field, "Password is incorrect.");
         }
     }

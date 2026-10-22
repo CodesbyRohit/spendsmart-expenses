@@ -156,6 +156,17 @@ class AuthIntegrationTest extends ApiTestSupport {
                 .andExpect(jsonPath("$.fieldErrors[0].field").value("currentPassword"));
     }
 
+    @Test
+    void repeatedWrongPasswordConfirmationsInsideASessionAreRateLimited() throws Exception {
+        Client c = register();
+        for (int i = 0; i < 5; i++) {
+            postAs(c, "/api/account/password", Map.of("currentPassword", "guess-number-" + i, "newPassword", "another-long-one"))
+                    .andExpect(status().isBadRequest());
+        }
+        postAs(c, "/api/account/password", Map.of("currentPassword", PASSWORD, "newPassword", "another-long-one"))
+                .andExpect(status().isTooManyRequests());
+    }
+
     private String login(String email, String password, int expectedStatus) throws Exception {
         return mvc.perform(post("/api/auth/login").with(csrf()).contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of("email", email, "password", password))))
