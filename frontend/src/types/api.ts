@@ -15,6 +15,8 @@ export interface User {
   displayName: string;
   defaultCurrency: string;
   locale: string;
+  /** IANA zone used by the server for "today" and "this month". */
+  timeZone: string;
   theme: Theme;
   budgetAlertsEnabled: boolean;
   budgetAlertThreshold: number;
@@ -256,6 +258,7 @@ export interface SearchResults {
 export interface AccountOptions {
   currencies: string[];
   locales: string[];
+  timeZones: string[];
 }
 
 export interface FieldError {

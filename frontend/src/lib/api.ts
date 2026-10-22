@@ -30,6 +30,8 @@ export interface RequestOptions {
   body?: unknown;
   query?: Query;
   signal?: AbortSignal;
+  /** Accept header. Downloads accept any type, so endpoints that return CSV are matched. */
+  accept?: string;
 }
 
 let unauthorizedHandler: (() => void) | null = null;
@@ -78,7 +80,7 @@ async function toApiError(response: Response): Promise<ApiError> {
 
 async function send(path: string, options: RequestOptions, retried: boolean): Promise<Response> {
   const method = options.method ?? "GET";
-  const headers: Record<string, string> = { Accept: "application/json" };
+  const headers: Record<string, string> = { Accept: options.accept ?? "application/json" };
   if (method !== "GET") {
     const token = await ensureCsrfToken();
     if (token) headers[CSRF_HEADER] = token;
@@ -125,7 +127,7 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
 
 /** Downloads an authenticated file (CSV/JSON export) without exposing the session to another origin. */
 export async function download(path: string, query: Query | undefined, fallbackName: string): Promise<void> {
-  const response = await send(path, { query }, false);
+  const response = await send(path, { query, accept: "*/*" }, false);
   if (!response.ok) throw await toApiError(response);
   const blob = await response.blob();
   const disposition = response.headers.get("Content-Disposition") ?? "";

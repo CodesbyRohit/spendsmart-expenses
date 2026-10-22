@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.spendsmart.ApiTestSupport;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
@@ -150,6 +151,24 @@ class TransactionApiTest extends ApiTestSupport {
                 .contains("\"'=HYPERLINK(\"\"http://evil\"\")\"")
                 .contains("\"Shop, \"\"Main\"\"\"")
                 .doesNotContain("Old item");
+    }
+
+    @Test
+    void csvExportWorksWithTheHeadersTheBrowserAppSends() throws Exception {
+        Client c = register();
+        createTx(c, "EXPENSE", "12.50", c.expense("Groceries"), TODAY, "Bread");
+        // Regression: with produces="text/csv", Accept: application/json (sent by the SPA client) fell through to
+        // GET /{id} with id="export" and returned 400 VALIDATION_FAILED.
+        for (String accept : List.of("application/json", "*/*", "text/csv")) {
+            var response = mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                            .get("/api/transactions/export").session(c.session()).header("Accept", accept))
+                    .andExpect(status().isOk())
+                    .andReturn().getResponse();
+            assertThat(response.getContentType()).as("Accept %s", accept).startsWith("text/csv");
+            assertThat(response.getContentAsString(java.nio.charset.StandardCharsets.UTF_8)).contains("Bread");
+        }
+        // Non-UUID path segments no longer reach the {id} handler as malformed ids.
+        getAs(c, "/api/transactions/not-a-real-endpoint").andExpect(status().isNotFound());
     }
 
     private void expectFieldError(Client c, Map<String, Object> body, String field) throws Exception {

@@ -1,0 +1,10 @@
+# Vulnerabilities accepted after review. Each entry states why it does not apply; revisit on every dependency update.
+# See docs/SECURITY.md ("Dependency scanning").
+
+# spring-webmvc 6.2.x — RCE via path handling in XsltView. Fixed only in Spring Framework 7.0.9 (Spring Boot 4).
+# Not reachable: SpendSmart renders no server-side views and has no XsltView/XSLT dependency (REST + static SPA only).
+CVE-2026-47884
+
+# spring-webmvc 6.2.x — stream corruption in Server-Sent Events rendered through views. Fixed only in 7.0.9.
+# Not reachable: SpendSmart uses neither SSE (SseEmitter / text/event-stream) nor view rendering.
+CVE-2026-47890

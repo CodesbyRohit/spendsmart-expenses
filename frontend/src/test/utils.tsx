@@ -14,6 +14,7 @@ export const testUser: User = {
   displayName: "Asha",
   defaultCurrency: "INR",
   locale: "en-IN",
+  timeZone: "Asia/Kolkata",
   theme: "LIGHT",
   budgetAlertsEnabled: true,
   budgetAlertThreshold: 80,

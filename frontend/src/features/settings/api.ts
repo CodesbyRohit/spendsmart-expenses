@@ -24,7 +24,7 @@ export function useUpdateProfile() {
 export function useUpdatePreferences() {
   const { setUser } = useAuth();
   return useMutation({
-    mutationFn: (input: { defaultCurrency: string; locale: string; theme: Theme; budgetAlertsEnabled: boolean; budgetAlertThreshold: number }) =>
+    mutationFn: (input: { defaultCurrency: string; locale: string; theme: Theme; budgetAlertsEnabled: boolean; budgetAlertThreshold: number; timeZone: string }) =>
       api<User>("/api/account/preferences", { method: "PUT", body: input }),
     onSuccess: setUser,
   });

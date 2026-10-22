@@ -8,8 +8,8 @@ import com.spendsmart.budget.BudgetService;
 import com.spendsmart.common.Money;
 import com.spendsmart.common.SpendingChangedEvent;
 import com.spendsmart.user.User;
+import com.spendsmart.user.UserClock;
 import com.spendsmart.user.UserLookup;
-import java.time.Clock;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
@@ -43,15 +43,15 @@ public class BudgetAlertService {
     private final BudgetService budgetService;
     private final NotificationRepository notifications;
     private final UserLookup userLookup;
-    private final Clock clock;
+    private final UserClock userClock;
     private final TransactionTemplate newTransaction;
 
     public BudgetAlertService(BudgetService budgetService, NotificationRepository notifications, UserLookup userLookup,
-                              Clock clock, PlatformTransactionManager transactionManager) {
+                              UserClock userClock, PlatformTransactionManager transactionManager) {
         this.budgetService = budgetService;
         this.notifications = notifications;
         this.userLookup = userLookup;
-        this.clock = clock;
+        this.userClock = userClock;
         this.newTransaction = new TransactionTemplate(transactionManager);
         this.newTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
@@ -65,7 +65,7 @@ public class BudgetAlertService {
                 if (!user.isBudgetAlertsEnabled()) {
                     return;
                 }
-                YearMonth current = YearMonth.now(clock);
+                YearMonth current = userClock.currentMonth(user);
                 event.affected().stream()
                         .filter(p -> p.month().equals(current))
                         .forEach(p -> evaluate(user, budgetService.status(user.getId(), p.month(), p.currency())));

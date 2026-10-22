@@ -94,6 +94,7 @@ function PreferencesCard() {
     theme: user.theme,
     budgetAlertsEnabled: user.budgetAlertsEnabled,
     budgetAlertThreshold: user.budgetAlertThreshold,
+    timeZone: user.timeZone,
   });
   const preview = formatMoney("1234567.89", values.defaultCurrency, values.locale);
   const f = useFormatters();
@@ -132,6 +133,18 @@ function PreferencesCard() {
           <p className="text-xs text-muted">
             Preview: <span className="tabular font-medium text-body">{preview}</span> · {new Intl.DateTimeFormat(values.locale, { dateStyle: "medium" }).format(new Date())}
           </p>
+          <Select
+            label="Time zone"
+            hint="Decides what counts as today and this month for budgets, alerts and goal dates."
+            value={values.timeZone}
+            onChange={(e) => setValues({ ...values, timeZone: e.target.value })}
+          >
+            {(options.data?.timeZones ?? [values.timeZone]).map((z) => (
+              <option key={z} value={z}>
+                {z.replace(/_/g, " ")}
+              </option>
+            ))}
+          </Select>
           <Select label="Theme" value={values.theme} onChange={(e) => setValues({ ...values, theme: e.target.value as Theme })}>
             <option value="SYSTEM">Match my device</option>
             <option value="LIGHT">Light</option>

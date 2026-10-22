@@ -6,7 +6,11 @@ spring:
     password: ${DB_PASSWORD}
 
 server:
-  forward-headers-strategy: native
+  # Do NOT trust X-Forwarded-* by default: Tomcat treats any private-network peer (every client of a Docker
+  # deployment) as a trusted proxy, so clients could spoof their IP and evade per-IP rate limits.
+  # Behind a reverse proxy you control that overwrites these headers, set SERVER_FORWARD_HEADERS_STRATEGY=native
+  # and restrict SERVER_TOMCAT_REMOTEIP_INTERNAL_PROXIES to that proxy's address (see docs/SECURITY.md).
+  forward-headers-strategy: ${SERVER_FORWARD_HEADERS_STRATEGY:none}
   servlet:
     session:
       cookie:

@@ -9,6 +9,7 @@ export interface RegisterInput {
   displayName: string;
   defaultCurrency: string;
   locale: string;
+  timeZone?: string;
 }
 
 interface AuthContextValue {

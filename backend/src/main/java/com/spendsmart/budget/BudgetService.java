@@ -22,9 +22,9 @@ import com.spendsmart.common.TransactionType;
 import com.spendsmart.transaction.TransactionRepository;
 import com.spendsmart.transaction.TransactionRepository.MonthlyCategorySum;
 import com.spendsmart.user.User;
+import com.spendsmart.user.UserClock;
 import com.spendsmart.user.UserLookup;
 import java.math.BigDecimal;
-import java.time.Clock;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.temporal.ChronoUnit;
@@ -51,17 +51,17 @@ public class BudgetService {
     private final CategoryService categoryService;
     private final UserLookup userLookup;
     private final ApplicationEventPublisher events;
-    private final Clock clock;
+    private final UserClock userClock;
 
     public BudgetService(MonthlyBudgetRepository budgets, TransactionRepository transactions,
                          CategoryService categoryService, UserLookup userLookup, ApplicationEventPublisher events,
-                         Clock clock) {
+                         UserClock userClock) {
         this.budgets = budgets;
         this.transactions = transactions;
         this.categoryService = categoryService;
         this.userLookup = userLookup;
         this.events = events;
-        this.clock = clock;
+        this.userClock = userClock;
     }
 
     @Transactional(readOnly = true)
@@ -135,7 +135,7 @@ public class BudgetService {
         String currency = Money.requireCurrency(rawCurrency, "currency");
         int span = Math.max(1, Math.min(months, 24));
         User user = userLookup.require(userId);
-        YearMonth last = YearMonth.now(clock);
+        YearMonth last = userClock.currentMonth(user);
         YearMonth first = last.minusMonths(span - 1L);
         Map<YearMonth, MonthlyBudget> plans = budgets.findPlansBetween(userId, currency, first.atDay(1), last.atDay(1))
                 .stream().collect(Collectors.toMap(MonthlyBudget::getMonth, Function.identity()));
@@ -187,7 +187,7 @@ public class BudgetService {
 
         BigDecimal allowance = null;
         Long daysLeft = null;
-        LocalDate today = LocalDate.now(clock);
+        LocalDate today = userClock.today(user);
         if (YearMonth.from(today).equals(month)) {
             daysLeft = ChronoUnit.DAYS.between(today, month.atEndOfMonth()) + 1;
             Measure total = result.total();

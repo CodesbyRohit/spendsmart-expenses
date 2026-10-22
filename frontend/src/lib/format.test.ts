@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { currencyDecimals, formatDate, formatMoney, formatPercent, parseISODate, toISODate } from "./format";
-import { detectPreset, isValidISODate, presetRange, shiftMonth } from "./dates";
+import { comparisonLabel, detectPreset, isValidISODate, presetRange, shiftMonth } from "./dates";
 import { safeNext } from "@/routes/guards";
 
 describe("money and number formatting", () => {
@@ -55,6 +55,18 @@ describe("dates", () => {
     expect(detectPreset({ from: "2026-09-01", to: "2026-09-30" }, today)).toBe("last-month");
     expect(detectPreset({ from: "2026-09-02", to: "2026-09-30" }, today)).toBe("custom");
     expect(shiftMonth("2026-01", -1)).toBe("2025-12");
+  });
+});
+
+describe("comparison labels match what the server compares against", () => {
+  it("names whole-month ranges by month count and anything else as the previous period", () => {
+    expect(comparisonLabel({ from: "2026-10-01", to: "2026-10-31" })).toBe("last month");
+    expect(comparisonLabel({ from: "2024-02-01", to: "2024-02-29" })).toBe("last month");
+    expect(comparisonLabel({ from: "2026-07-01", to: "2026-09-30" })).toBe("the previous 3 months");
+    expect(comparisonLabel({ from: "2026-01-01", to: "2026-12-31" })).toBe("the previous 12 months");
+    // Starts on the 1st but doesn't end on a month end: the server uses the same number of days before it.
+    expect(comparisonLabel({ from: "2026-07-01", to: "2026-09-28" })).toBe("the previous period");
+    expect(comparisonLabel({ from: "2026-09-16", to: "2026-10-15" })).toBe("the previous period");
   });
 });
 

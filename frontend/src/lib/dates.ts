@@ -62,6 +62,22 @@ export function shiftMonth(month: string, delta: number): string {
   return toISODate(d).slice(0, 7);
 }
 
+/**
+ * Words for the period the server compares against (it mirrors DateRange.previous() on the backend):
+ * whole calendar months compare with the same number of preceding months; anything else with the same
+ * number of days immediately before.
+ */
+export function comparisonLabel(range: DateRangeValue): string {
+  const from = parseISODate(range.from);
+  const to = parseISODate(range.to);
+  const endOfToMonth = new Date(to.getFullYear(), to.getMonth() + 1, 0).getDate();
+  if (from.getDate() === 1 && to.getDate() === endOfToMonth) {
+    const months = (to.getFullYear() - from.getFullYear()) * 12 + (to.getMonth() - from.getMonth()) + 1;
+    return months === 1 ? "last month" : `the previous ${months} months`;
+  }
+  return "the previous period";
+}
+
 export function isValidISODate(value: string | null | undefined): value is ISODate {
   if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   return toISODate(parseISODate(value)) === value;

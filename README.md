@@ -27,8 +27,9 @@ is estimated or invented, and nothing is sent to third-party services.
   amount needed per month.
 - **Dashboard and analytics**: income, expenses and net for any date range; budget usage; category breakdown;
   spending trend; month-over-month comparison; regular-payment detection; and plain-language insights.
-- **Everywhere**: global search, a light/dark/system theme, locale-aware number and date formats, mobile layouts,
-  keyboard navigation and reduced-motion support.
+- **Everywhere**: global search, a light/dark/system theme, locale-aware number and date formats, a per-user time
+  zone (so "today" and "this month" match your calendar), mobile layouts, keyboard navigation and reduced-motion
+  support.
 
 ## Prerequisites
 
@@ -116,8 +117,9 @@ The image builds the React app and serves it from Spring Boot on the same origin
 cookies, API explorer off). On plain `http://localhost`, compose sets `COOKIE_SECURE=false`; behind HTTPS, leave it
 `true`.
 
-Verified on 2026-10-22 (Docker Engine 29.8.2): the image builds, the container reports `healthy`, Flyway applies V1 to
-an empty PostgreSQL 16.14 database, and the Playwright suite passes against `http://localhost:8080` (see Tests).
+Verified on 2026-10-22 (Docker Engine 29.8.2) with the current code: the image builds, the container reports
+`healthy`, Flyway applies V1 and V2 to an empty PostgreSQL 16.14 database, a restart applies nothing new, and the
+Playwright suite passes against `http://localhost:8080` (see Tests).
 
 ## Profiles
 
@@ -146,15 +148,32 @@ Sample data is never created automatically.
 
 | Suite | Command | Result on 2026-10-22 |
 | --- | --- | --- |
-| Backend (unit, MockMvc API, repository, auth, isolation, PostgreSQL migration) | `cd backend && ./mvnw test` (`.\mvnw.cmd test`) | **89 run, 0 failed, 0 skipped** (Docker running) |
-| Frontend unit/component | `cd frontend && npm test` | **28 passed** (7 files) |
+| Backend on H2 (unit, MockMvc API, repository, auth, isolation, Testcontainers migration tests) | `cd backend && ./mvnw test` (`.\mvnw.cmd test`) | **99 run, 0 failed, 0 skipped** (Docker running) |
+| Backend, **whole suite on PostgreSQL 16** | `cd backend && ./mvnw test -Ppostgres` | **99 run, 0 failed, 0 skipped** on PostgreSQL 16.14 |
+| Frontend unit/component | `cd frontend && npm test` | **29 passed** (7 files) |
 | Frontend typecheck + production build | `cd frontend && npm run build` | passed |
-| End-to-end, dev stack (jar + H2 + Vite) | `cd frontend && npm run e2e` | **6 passed** (desktop + mobile projects) |
-| End-to-end, Docker image + PostgreSQL 16 | `docker compose --profile app up -d --build`, then `E2E_BASE_URL=http://localhost:8080 npx playwright test` | **6 passed** |
+| End-to-end, dev stack (jar + H2 + Vite) | `cd frontend && npm run e2e` | **7 passed** (desktop + mobile projects) |
+| npm dependency audit | `cd frontend && npm audit` | **0 vulnerabilities** |
+| Maven dependency scan | Trivy 0.76.1 `fs` on `backend/pom.xml` | 2 accepted findings (see `docs/SECURITY.md`) |
+| Docker image: clean install | `docker compose --profile app up -d --build` | healthy in ~8 s; Flyway applied V1 and V2 to an empty PostgreSQL 16.14 |
+| Docker image: restart | `docker compose restart app` | graceful shutdown; 2 migrations validated, none re-applied |
+| End-to-end against the image | `E2E_BASE_URL=http://localhost:8080 npx playwright test` | **7 passed** |
+| Image OS packages | Trivy 0.76.1 `image --pkg-types os` (HIGH/CRITICAL) | **0 findings** (Ubuntu 26.04 base) |
 
-`PostgresMigrationTest` applies every migration to a fresh PostgreSQL 16 started by Testcontainers and lets Hibernate
-validate the entities against it. It needs a running Docker daemon and **skips itself** (it does not fail) without
-one, so check the summary says `Skipped: 0` when you rely on it.
+Three tests need a running Docker daemon and **skip themselves** (they don't fail) without one, so check the summary
+says `Skipped: 0` when you rely on them:
+
+- `PostgresMigrationTest` applies every migration to a fresh PostgreSQL 16.
+- `MigrationUpgradeTest` upgrades a V1 database that already holds data to the latest version.
+- With `-Ppostgres`, the whole suite runs against PostgreSQL instead of H2. `DatabaseEngineTest` fails that run if
+  it silently fell back to H2.
+
+### Continuous integration
+
+`.github/workflows/ci.yml` runs on every pull request and every push to `main`: the backend suite on PostgreSQL, the
+frontend audit, tests and build, the Playwright suite, and a Docker image build with a Trivy gate (HIGH/CRITICAL with a
+fix available, minus the justified entries in `.trivyignore`). The workflow was added on 2026-10-22 and has not run
+on GitHub yet.
 
 **End-to-end tests**
 
@@ -170,7 +189,11 @@ With `JAVA_HOME` set to JDK 21, Playwright starts both servers. If servers are a
 
 The suites cover: registration and sign-in, expense creation, list and dashboard updates, category budgets
 reflecting spending, editing and deleting with budget recalculation, threshold alerts, savings-goal progress,
-validation, cross-user isolation (UI and direct API calls), and mobile layout at 375 px with no horizontal overflow.
+validation, cross-user isolation (UI and direct API calls), creating a category and filtering by it, filtered CSV
+download, sign-out locking protected pages and the API, and mobile layout at 375 px with no horizontal overflow.
+
+To run the same suite against an already-running deployment (for example the Docker image), set `E2E_BASE_URL`:
+`E2E_BASE_URL=http://localhost:8080 npx playwright test`.
 
 ## Project layout
 
@@ -207,3 +230,8 @@ docs/                   ARCHITECTURE.md, SECURITY.md, API.md, IMPLEMENTATION_PLA
 - **No recurring-transaction scheduler.** Regular payments are *detected* in your history, not created
   automatically.
 - **No password reset by email**, because no email provider is configured.
+- **No refund or transfer type.** A transaction is either income or an expense. Recording a refund as income inflates
+  income and leaves the original category's spending unchanged; editing or deleting the original expense is the
+  accurate option today. Moving money between your own accounts isn't modelled.
+- **Behind a reverse proxy**, forwarded headers are ignored unless you enable them. See "Running behind a reverse
+  proxy" in `docs/SECURITY.md`.

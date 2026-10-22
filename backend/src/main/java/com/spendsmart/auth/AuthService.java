@@ -10,6 +10,7 @@ import com.spendsmart.security.AuthRateLimiter;
 import com.spendsmart.security.AuthenticatedUser;
 import com.spendsmart.user.Locales;
 import com.spendsmart.user.User;
+import com.spendsmart.user.UserClock;
 import com.spendsmart.user.UserRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -52,7 +53,9 @@ public class AuthService {
         if (users.existsByEmail(email)) {
             throw new FieldValidationException("email", "An account with this email already exists. Sign in instead.");
         }
-        User user = users.saveAndFlush(new User(email, passwordEncoder.encode(request.password()), name, currency, locale));
+        User newUser = new User(email, passwordEncoder.encode(request.password()), name, currency, locale);
+        newUser.setTimeZone(UserClock.isValidZone(request.timeZone()) ? request.timeZone() : UserClock.DEFAULT_ZONE);
+        User user = users.saveAndFlush(newUser);
         categoryService.seedDefaults(user.getId());
         return new AuthenticatedUser(user.getId(), user.getEmail(), user.getCredentialVersion());
     }

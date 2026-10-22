@@ -5,7 +5,8 @@
 FROM node:22-alpine AS frontend
 WORKDIR /src/frontend
 COPY frontend/package.json frontend/package-lock.json ./
-RUN npm ci --no-audit --no-fund
+# Cache mounts keep downloaded packages between builds (fewer registry requests, faster rebuilds).
+RUN --mount=type=cache,target=/root/.npm npm ci --no-audit --no-fund
 COPY frontend/ ./
 RUN npx vite build
 
@@ -14,9 +15,9 @@ FROM eclipse-temurin:21-jdk AS backend
 WORKDIR /src/backend
 COPY backend/.mvn .mvn
 COPY backend/mvnw backend/pom.xml ./
-RUN chmod +x mvnw && ./mvnw -B -q dependency:go-offline
+RUN --mount=type=cache,target=/root/.m2 chmod +x mvnw && ./mvnw -B -q dependency:go-offline
 COPY backend/src src
-RUN ./mvnw -B -q -DskipTests package
+RUN --mount=type=cache,target=/root/.m2 ./mvnw -B -q -DskipTests package
 
 # --- Runtime ----------------------------------------------------------------
 FROM eclipse-temurin:21-jre

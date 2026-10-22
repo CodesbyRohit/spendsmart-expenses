@@ -16,6 +16,7 @@ import { CategoryBarChart, MonthlyIncomeExpenseChart, SpendingTrendChart } from 
 import { CurrencyControl, DateRangeControl, useUrlDateRange } from "@/components/filters";
 import { errorMessage } from "@/lib/api";
 import { cn } from "@/lib/cn";
+import { comparisonLabel } from "@/lib/dates";
 import type { Dashboard, Decimal, Insight } from "@/types/api";
 
 export function DashboardPage() {
@@ -128,7 +129,7 @@ function FirstRun() {
 function Delta({ value, inverse, previousIsZero, label }: { value?: Decimal; inverse?: boolean; previousIsZero: boolean; label: string }) {
   const f = useFormatters();
   if (value === undefined || value === null) {
-    return <span className="text-xs text-subtle">{previousIsZero ? `Nothing recorded ${label}` : "No comparison"}</span>;
+    return <span className="text-xs text-subtle">{previousIsZero ? `Nothing recorded ${label === "last month" ? label : `in ${label}`}` : "No comparison"}</span>;
   }
   const n = Number(value);
   const up = n > 0;
@@ -160,7 +161,7 @@ function DashboardContent({ data }: { data: Dashboard }) {
   const o = data.overview;
   const c = o.currency;
   const b = data.budget;
-  const prevLabel = o.range.days >= 28 && o.range.from.endsWith("-01") ? "last month" : "previous period";
+  const prevLabel = comparisonLabel(o.range);
 
   return (
     <div className="space-y-5">
