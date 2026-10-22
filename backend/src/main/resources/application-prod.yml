@@ -1,9 +1,14 @@
 # Production: PostgreSQL only, credentials required from the environment, secure cookies, no API explorer.
 spring:
   datasource:
-    url: ${DB_URL}
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
+    # DB_URL wins when set. Platforms such as Railway/Neon/Heroku/Render inject DATABASE_URL directly
+    # (postgres://user:pass@host:5432/db?sslmode=require); PostgresUrlEnvironmentPostProcessor converts that
+    # scheme to jdbc:postgresql:// and lifts the embedded credentials at startup, so no URL has to be copied
+    # between dashboard fields. An empty default for username/password lets the URL's own userinfo apply;
+    # explicit DB_USERNAME/DB_PASSWORD always win over it.
+    url: ${DB_URL:${DATABASE_URL:}}
+    username: ${DB_USERNAME:}
+    password: ${DB_PASSWORD:}
 
 server:
   # Do NOT trust X-Forwarded-* by default: Tomcat treats any private-network peer (every client of a Docker
