@@ -1,0 +1,11 @@
+# Local development against PostgreSQL (docker compose up -d db).
+# DB_PASSWORD must be provided via the environment or a local .env file — see .env.example.
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/spendsmart}
+    username: ${DB_USERNAME:spendsmart}
+    password: ${DB_PASSWORD:}
+
+app:
+  cors:
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:}
